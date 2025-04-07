@@ -2,6 +2,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Settings, Mail, Save } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { UserNav } from "@/components/user-nav"
 
 export default function Home() {
   return (
@@ -13,7 +14,7 @@ export default function Home() {
             Create templates with background images and text fields, then generate images using CSV data.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <ThemeToggle />
           <Link href="/settings">
             <Button variant="outline">
@@ -21,6 +22,7 @@ export default function Home() {
               Settings
             </Button>
           </Link>
+          <UserNav />
         </div>
       </div>
 
@@ -45,13 +47,13 @@ export default function Home() {
           </div>
         </Link>
 
-        <Link href="/email-templates" className="block">
+        <Link href="/send-email" className="block">
           <div className="border border-gray-200 dark:border-gray-800 rounded-lg p-6 hover:border-primary hover:shadow-md transition-all">
             <div className="h-40 bg-gray-100 dark:bg-gray-800 rounded-md flex items-center justify-center mb-4">
               <Mail className="h-12 w-12 text-gray-400 dark:text-gray-600" />
             </div>
-            <h2 className="text-xl font-semibold mb-2">Email Templates</h2>
-            <p className="text-gray-600 dark:text-gray-400">Manage your email content templates</p>
+            <h2 className="text-xl font-semibold mb-2">Send Emails</h2>
+            <p className="text-gray-600 dark:text-gray-400">Send emails using templates and CSV data</p>
           </div>
         </Link>
       </div>

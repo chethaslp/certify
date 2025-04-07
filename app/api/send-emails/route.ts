@@ -1,51 +1,155 @@
 import { NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { db } from "@/lib/db"
 import nodemailer from "nodemailer"
+import { sendSSEMessage } from "../send-emails-sse/route"
+
+export const runtime = "nodejs"
 
 export async function POST(request: Request) {
   try {
-    const { settings, template, recipients } = await request.json()
+    const session = await getServerSession()
 
-    // Create email transporter
-    const transporter = nodemailer.createTransport({
-      host: settings.smtpServer,
-      port: Number.parseInt(settings.smtpPort),
-      secure: settings.smtpPort === "465",
-      auth: {
-        user: settings.smtpUsername,
-        pass: settings.smtpPassword,
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { profileId, templateId, emailColumn, csvData, images } = await request.json()
+
+    if (!profileId || !templateId || !emailColumn || !csvData || !images) {
+      return NextResponse.json({ error: "Missing required data" }, { status: 400 })
+    }
+
+    // Get email profile
+    const profile = await db.emailProfile.findUnique({
+      where: {
+        id: profileId,
+        userId: session.user.id as string,
       },
     })
+
+    if (!profile) {
+      return NextResponse.json({ error: "Email profile not found" }, { status: 404 })
+    }
+
+    // Get email template
+    const emailTemplate = await db.emailTemplate.findUnique({
+      where: {
+        id: templateId,
+        userId: session.user.id as string,
+      },
+    })
+
+    if (!emailTemplate) {
+      return NextResponse.json({ error: "Email template not found" }, { status: 404 })
+    }
+
+    // Return success to begin the process
+    const response = NextResponse.json({ success: true })
+
+    // Continue processing in the background
+    sendEmailsInBackground(profile, emailTemplate, emailColumn, csvData, images)
+
+    return response
+  } catch (error) {
+    console.error("Error starting email send:", error)
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Failed to send emails",
+      },
+      { status: 500 },
+    )
+  }
+}
+
+async function sendEmailsInBackground(
+  profile: any,
+  emailTemplate: any,
+  emailColumn: string,
+  csvData: Array<Record<string, string>>,
+  images: string[],
+) {
+  try {
+    // Create email transporter
+    const transporter = nodemailer.createTransport({
+      host: profile.smtpServer,
+      port: Number.parseInt(profile.smtpPort || "587"),
+      secure: profile.smtpPort === "465",
+      auth: {
+        user: profile.smtpUsername,
+        pass: profile.smtpPassword,
+      },
+    })
+
+    // Verify connection
+    await transporter.verify()
 
     let sent = 0
     let failed = 0
 
+    // Send initial progress
+    sendSSEMessage({
+      type: "progress",
+      total: csvData.length,
+      sent,
+      failed,
+      currentEmail: null,
+    })
+
     // Send emails to each recipient
-    for (const recipient of recipients) {
+    for (let i = 0; i < csvData.length; i++) {
+      const row = csvData[i]
+      const email = row[emailColumn]
+
+      // Skip if no email address
+      if (!email) {
+        failed++
+
+        sendSSEMessage({
+          type: "progress",
+          total: csvData.length,
+          sent,
+          failed,
+          currentEmail: null,
+          message: `Skipped row ${i + 1}: No email address`,
+        })
+
+        continue
+      }
+
       try {
-        // Skip if no email address
-        if (!recipient.email) {
-          failed++
-          continue
-        }
+        // Update current status
+        sendSSEMessage({
+          type: "progress",
+          total: csvData.length,
+          sent,
+          failed,
+          currentEmail: email,
+          message: `Sending to ${email}...`,
+        })
 
         // Replace variables in content
-        let content = template.content
-        let subject = template.subject
+        let content = emailTemplate.content
+        let subject = emailTemplate.subject
 
         // Replace variables in subject and content
-        for (const [key, value] of Object.entries(recipient.data)) {
+        for (const [key, value] of Object.entries(row)) {
           const regex = new RegExp(`{{${key}}}`, "g")
           subject = subject.replace(regex, value as string)
           content = content.replace(regex, value as string)
         }
 
-        // Convert image data URL to attachment
-        const imageData = recipient.imageUrl.split(",")[1]
+        // Get image for this recipient
+        const imageData = images[i]?.split(",")[1]
+
+        if (!imageData) {
+          throw new Error("Image data missing for this recipient")
+        }
 
         // Send email
         await transporter.sendMail({
-          from: `"${settings.senderName}" <${settings.senderEmail}>`,
-          to: recipient.email,
+          from: `"${profile.senderName}" <${profile.senderEmail}>`,
+          to: email,
           subject: subject,
           html: content,
           attachments: [
@@ -58,16 +162,49 @@ export async function POST(request: Request) {
         })
 
         sent++
+
+        // Add slight delay to avoid overwhelming the email server
+        await new Promise((resolve) => setTimeout(resolve, 200))
+
+        sendSSEMessage({
+          type: "progress",
+          total: csvData.length,
+          sent,
+          failed,
+          currentEmail: null,
+          message: `Sent to ${email}`,
+        })
       } catch (error) {
-        console.error(`Error sending email to ${recipient.email}:`, error)
+        console.error(`Error sending email to ${email}:`, error)
         failed++
+
+        sendSSEMessage({
+          type: "progress",
+          total: csvData.length,
+          sent,
+          failed,
+          currentEmail: null,
+          message: `Failed to send to ${email}: ${error instanceof Error ? error.message : "Unknown error"}`,
+        })
       }
     }
 
-    return NextResponse.json({ sent, failed })
+    // Send completion message
+    sendSSEMessage({
+      type: "complete",
+      total: csvData.length,
+      sent,
+      failed,
+      message: `Completed sending emails. Sent: ${sent}, Failed: ${failed}`,
+    })
   } catch (error) {
-    console.error("Error sending emails:", error)
-    return NextResponse.json({ error: "Failed to send emails" }, { status: 500 })
+    console.error("Error in background email sending:", error)
+
+    // Send error message
+    sendSSEMessage({
+      type: "error",
+      message: error instanceof Error ? error.message : "Failed to send emails",
+    })
   }
 }
 

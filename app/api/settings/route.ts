@@ -8,8 +8,7 @@ export async function GET() {
 
     return NextResponse.json({ settings })
   } catch (error) {
-    // @ts-ignore
-    console.error("Error fetching settings:", error.stack)
+    console.error("Error fetching settings:", error)
     return NextResponse.json({ error: "Failed to fetch settings" }, { status: 500 })
   }
 }
@@ -30,8 +29,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ settings: updatedSettings })
   } catch (error) {
-    // @ts-ignore
-    console.error("Error saving settings:", error.stack)
+    console.error("Error saving settings:", error)
     return NextResponse.json({ error: "Failed to save settings" }, { status: 500 })
   }
 }
