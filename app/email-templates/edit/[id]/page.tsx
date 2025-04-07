@@ -8,8 +8,8 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ChevronLeft } from "lucide-react"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { ChevronLeft, Save } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import EmailEditor from "@/components/email-editor"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -152,7 +152,7 @@ export default function EditEmailTemplatePage() {
   }
 
   return (
-    <main className="container mx-auto py-8 px-4">
+    <div className="container mx-auto py-8 px-4">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center">
           <Link href="/email-templates">
@@ -205,8 +205,8 @@ export default function EditEmailTemplatePage() {
                 onChange={handleContentChange}
               />
             </div>
-            <p className="text-sm text-gray-500">\
-              Use variables like {{"{{\"}}name{{\"}}\"}}, {{\"{{\"}}email{{\"}}\"}}, etc. to insert dynamic content from your CSV data.
+            <p className="text-sm text-gray-500">
+                Use variables like {`{{Name}} {{Date}}`}, etc. to insert dynamic content from your CSV data.
             </p>
           </div>
         </CardContent>
@@ -220,7 +220,7 @@ export default function EditEmailTemplatePage() {
           </Button>
         </CardFooter>
       </Card>
-    </main>
+    </div>
   );
 }
 
