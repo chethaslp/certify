@@ -381,11 +381,30 @@ export default function TemplateCreator() {
     const zip = new JSZip()
     const folder = zip.folder("generated-images")
 
+    // Prompt user for filename field only once (before the loop)
+    let filenameField = ""
+    if (csvData.length > 0) {
+      filenameField = prompt(
+      "Enter the CSV field to use for filenames (e.g. 'name', 'email', etc.):",
+      Object.keys(csvData[0])[0]
+      ) || Object.keys(csvData[0])[0]
+    }
+
     // Add each image to the zip
     generatedImages.forEach((dataUrl, index) => {
       // Convert data URL to blob
       const data = dataUrl.split(",")[1]
-      folder?.file(`image-${index + 1}.png`, data, { base64: true })
+      let baseName = "image"
+      
+      if (csvData[index] && filenameField && csvData[index][filenameField]) {
+      // Sanitize filename (remove special chars, spaces, etc.)
+      baseName = csvData[index][filenameField]
+        .replace(/[\/\\?%*:|"<>]/g, "")
+        .replace(/\s+/g, "_")
+        .substring(0, 32) // limit length
+      }
+      
+      folder?.file(`${baseName}-${index + 1}.png`, data, { base64: true })
     })
 
     // Generate and save the zip file

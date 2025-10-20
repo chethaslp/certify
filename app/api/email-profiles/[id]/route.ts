@@ -1,22 +1,17 @@
 import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
 import { db } from "@/lib/db"
+import { requireAuthUserId } from "@/lib/auth"
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const session = await getServerSession()
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
+    const userId = await requireAuthUserId()
     const profileId = params.id
 
     // Check if profile exists and belongs to user
-    const profile = await db.emailProfile.findUnique({
+    const profile = await db.emailProfile.findFirst({
       where: {
         id: profileId,
-        userId: session.user.id as string,
+        userId,
       },
     })
 
@@ -28,7 +23,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     if (profile.isDefault) {
       const anotherProfile = await db.emailProfile.findFirst({
         where: {
-          userId: session.user.id as string,
+          userId,
           id: { not: profileId },
         },
       })
@@ -48,6 +43,9 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    if (error instanceof Error && error.message.includes("Unauthorized")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
     console.error("Error deleting email profile:", error)
     return NextResponse.json({ error: "Failed to delete email profile" }, { status: 500 })
   }

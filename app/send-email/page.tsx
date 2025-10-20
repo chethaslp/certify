@@ -16,6 +16,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { UserNav } from "@/components/user-nav"
 import { Progress } from "@/components/ui/progress"
 import CSVImporter from "@/components/csv-importer"
+import { TestSendDialog } from "@/components/test-send-dialog"
 
 interface EmailProfile {
   id: string
@@ -68,6 +69,8 @@ export default function SendEmailPage() {
     inProgress: false,
     complete: false,
   })
+  const [activeTab, setActiveTab] = useState<string>("setup")
+  const [testDialogOpen, setTestDialogOpen] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -166,16 +169,26 @@ export default function SendEmailPage() {
   }
 
   const handleSendEmails = async () => {
-    if (!selectedEmailProfile || !selectedEmailTemplate || !emailColumnField || !generatedImages.length) {
+    if (!selectedEmailProfile || !selectedEmailTemplate || !emailColumnField || !csvData.length) {
       toast({
         title: "Missing requirements",
-        description: "Please ensure you've selected an email profile, template, and column containing email addresses.",
+        description: "Please complete all setup steps before sending.",
         variant: "destructive",
       })
       return
     }
 
-    // Set initial sending status
+    if (!generatedImages || generatedImages.length === 0) {
+      toast({
+        title: "Missing images",
+        description: "Please generate images before sending emails.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Switch to status tab and initialize sending status
+    setActiveTab("status")
     setSendingStatus({
       total: csvData.length,
       sent: 0,
@@ -183,7 +196,6 @@ export default function SendEmailPage() {
       inProgress: true,
       complete: false,
     })
-
     try {
       // Create a connection to the server using EventSource
       const eventSource = new EventSource(
@@ -377,10 +389,14 @@ export default function SendEmailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <Tabs defaultValue="setup">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-4">
-              <TabsTrigger value="setup">Setup</TabsTrigger>
-              <TabsTrigger value="preview">Preview & Send</TabsTrigger>
+              <TabsTrigger value="setup" disabled={sendingStatus.inProgress}>
+                Setup
+              </TabsTrigger>
+              <TabsTrigger value="preview" disabled={sendingStatus.inProgress}>
+                Preview & Send
+              </TabsTrigger>
               <TabsTrigger value="status" disabled={!sendingStatus.inProgress && !sendingStatus.complete}>
                 Status
               </TabsTrigger>
@@ -582,14 +598,25 @@ export default function SendEmailPage() {
                         </div>
                       </div>
 
-                      <Button
-                        onClick={handleSendEmails}
-                        className="w-full"
-                        disabled={!selectedEmailProfile || !selectedEmailTemplate || !emailColumnField}
-                      >
-                        <Mail className="mr-2 h-4 w-4" />
-                        Send Emails ({csvData.length})
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => setTestDialogOpen(true)}
+                          variant="outline"
+                          className="flex-1"
+                          disabled={!selectedTemplate || !selectedEmailTemplate}
+                        >
+                          <Mail className="mr-2 h-4 w-4" />
+                          Send Test Email
+                        </Button>
+                        <Button
+                          onClick={handleSendEmails}
+                          className="flex-1"
+                          disabled={!selectedEmailProfile || !selectedEmailTemplate || !emailColumnField}
+                        >
+                          <Mail className="mr-2 h-4 w-4" />
+                          Send Emails ({csvData.length})
+                        </Button>
+                      </div>
                     </>
                   ) : (
                     <div className="text-center py-12">
@@ -613,6 +640,14 @@ export default function SendEmailPage() {
                   )}
                 </CardContent>
               </Card>
+
+              <TestSendDialog
+                open={testDialogOpen}
+                onOpenChange={setTestDialogOpen}
+                templateId={selectedTemplate}
+                profileId={selectedEmailProfile}
+                emailTemplateId={selectedEmailTemplate}
+              />
             </TabsContent>
 
             <TabsContent value="status">

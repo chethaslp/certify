@@ -1,22 +1,17 @@
 import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
 import { db } from "@/lib/db"
+import { requireAuthUserId } from "@/lib/auth"
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    const session = await getServerSession()
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
+    const userId = await requireAuthUserId()
     const templateId = params.id
 
     // Get template
-    const template = await db.template.findUnique({
+    const template = await db.template.findFirst({
       where: {
         id: templateId,
-        userId: session.user.id as string,
+        userId,
       },
     })
 
@@ -76,6 +71,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     return NextResponse.json({ images })
   } catch (error) {
+    if (error instanceof Error && error.message.includes("Unauthorized")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
     console.error("Error generating images:", error)
     return NextResponse.json(
       {

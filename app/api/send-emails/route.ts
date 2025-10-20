@@ -1,18 +1,14 @@
 import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
 import { db } from "@/lib/db"
 import nodemailer from "nodemailer"
 import { sendSSEMessage } from "../send-emails-sse/route"
+import { requireAuthUserId } from "@/lib/auth"
 
 export const runtime = "nodejs"
 
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession()
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const userId = await requireAuthUserId()
 
     const { profileId, templateId, emailColumn, csvData, images } = await request.json()
 
@@ -21,10 +17,10 @@ export async function POST(request: Request) {
     }
 
     // Get email profile
-    const profile = await db.emailProfile.findUnique({
+    const profile = await db.emailProfile.findFirst({
       where: {
         id: profileId,
-        userId: session.user.id as string,
+        userId,
       },
     })
 
@@ -33,10 +29,10 @@ export async function POST(request: Request) {
     }
 
     // Get email template
-    const emailTemplate = await db.emailTemplate.findUnique({
+    const emailTemplate = await db.emailTemplate.findFirst({
       where: {
         id: templateId,
-        userId: session.user.id as string,
+        userId,
       },
     })
 
@@ -52,6 +48,9 @@ export async function POST(request: Request) {
 
     return response
   } catch (error) {
+    if (error instanceof Error && error.message.includes("Unauthorized")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
     console.error("Error starting email send:", error)
     return NextResponse.json(
       {
@@ -71,15 +70,24 @@ async function sendEmailsInBackground(
 ) {
   try {
     // Create email transporter
-    const transporter = nodemailer.createTransport({
-      host: profile.smtpServer,
-      port: Number.parseInt(profile.smtpPort || "587"),
-      secure: profile.smtpPort === "465",
-      auth: {
-        user: profile.smtpUsername,
-        pass: profile.smtpPassword,
-      },
-    })
+    const transporter = profile.smtpServer === "smtp.google.com"
+          ? nodemailer.createTransport({
+            service: "gmail",
+            auth: {
+            user: profile.smtpUsername,
+            pass: profile.smtpPassword,
+            },
+          })
+          : nodemailer.createTransport({
+            host: profile.smtpServer,
+            port: Number.parseInt(profile.smtpPort || "587"),
+            secure: profile.smtpPort === "465",
+            requireTLS: profile.smtpPort !== "465",
+            auth: {
+            user: profile.smtpUsername,
+            pass: profile.smtpPassword,
+            },
+          })
 
     // Verify connection
     await transporter.verify()
@@ -133,10 +141,14 @@ async function sendEmailsInBackground(
         let subject = emailTemplate.subject
 
         // Replace variables in subject and content
+        // Support both {variable} and {{variable}} formats
         for (const [key, value] of Object.entries(row)) {
-          const regex = new RegExp(`{{${key}}}`, "g")
-          subject = subject.replace(regex, value as string)
-          content = content.replace(regex, value as string)
+          const regex1 = new RegExp(`\\{${key}\\}`, "gi")
+          const regex2 = new RegExp(`\\{\\{${key}\\}\\}`, "gi")
+          subject = subject.replace(regex1, value as string)
+          subject = subject.replace(regex2, value as string)
+          content = content.replace(regex1, value as string)
+          content = content.replace(regex2, value as string)
         }
 
         // Get image for this recipient
@@ -154,7 +166,7 @@ async function sendEmailsInBackground(
           html: content,
           attachments: [
             {
-              filename: "generated-image.png",
+              filename: "Certificate.png",
               content: imageData,
               encoding: "base64",
             },

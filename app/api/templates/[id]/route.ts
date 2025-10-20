@@ -1,22 +1,17 @@
 import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
 import { db } from "@/lib/db"
+import { requireAuthUserId } from "@/lib/auth"
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const session = await getServerSession()
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
+    const userId = await requireAuthUserId()
     const templateId = params.id
 
     // Get template
-    const template = await db.template.findUnique({
+    const template = await db.template.findFirst({
       where: {
         id: templateId,
-        userId: session.user.id as string,
+        userId,
       },
     })
 
@@ -32,6 +27,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
     return NextResponse.json({ template: parsedTemplate })
   } catch (error) {
+    if (error instanceof Error && error.message.includes("Unauthorized")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
     console.error("Error fetching template:", error)
     return NextResponse.json({ error: "Failed to fetch template" }, { status: 500 })
   }
@@ -39,19 +37,14 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const session = await getServerSession()
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
+    const userId = await requireAuthUserId()
     const templateId = params.id
 
     // Check if template exists and belongs to user
-    const template = await db.template.findUnique({
+    const template = await db.template.findFirst({
       where: {
         id: templateId,
-        userId: session.user.id as string,
+        userId,
       },
     })
 
@@ -66,6 +59,9 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    if (error instanceof Error && error.message.includes("Unauthorized")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
     console.error("Error deleting template:", error)
     return NextResponse.json({ error: "Failed to delete template" }, { status: 500 })
   }
@@ -73,20 +69,15 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    const session = await getServerSession()
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
+    const userId = await requireAuthUserId()
     const templateId = params.id
     const templateData = await request.json()
 
     // Check if template exists and belongs to user
-    const existingTemplate = await db.template.findUnique({
+    const existingTemplate = await db.template.findFirst({
       where: {
         id: templateId,
-        userId: session.user.id as string,
+        userId,
       },
     })
 
@@ -108,6 +99,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     return NextResponse.json({ template: updatedTemplate })
   } catch (error) {
+    if (error instanceof Error && error.message.includes("Unauthorized")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
     console.error("Error updating template:", error)
     return NextResponse.json({ error: "Failed to update template" }, { status: 500 })
   }

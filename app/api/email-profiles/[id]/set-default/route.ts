@@ -1,22 +1,17 @@
 import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
 import { db } from "@/lib/db"
+import { requireAuthUserId } from "@/lib/auth"
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    const session = await getServerSession()
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
+    const userId = await requireAuthUserId()
     const profileId = params.id
 
     // Check if profile exists and belongs to user
-    const profile = await db.emailProfile.findUnique({
+    const profile = await db.emailProfile.findFirst({
       where: {
         id: profileId,
-        userId: session.user.id as string,
+        userId,
       },
     })
 
@@ -27,7 +22,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     // Remove default from other profiles
     await db.emailProfile.updateMany({
       where: {
-        userId: session.user.id as string,
+        userId,
         isDefault: true,
       },
       data: {
@@ -43,6 +38,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    if (error instanceof Error && error.message.includes("Unauthorized")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
     console.error("Error setting default email profile:", error)
     return NextResponse.json({ error: "Failed to set default email profile" }, { status: 500 })
   }

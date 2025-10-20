@@ -2,9 +2,11 @@ import NextAuth from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { db } from "@/lib/db"
+import { NextAuthOptions } from "next-auth"
 
-const handler = NextAuth({
+export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(db),
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -19,22 +21,24 @@ const handler = NextAuth({
     strategy: "jwt",
   },
   callbacks: {
-    async signIn({ user, account, profile }: any) {
-      try {
-        return true
-      } catch (error) {
-        console.error("Error during sign in:", error)
-        return false
+    async jwt({ token, user, account }) {
+      // On sign in, store the database user ID in the token
+      if (user) {
+        token.userId = user.id
       }
+      return token
     },
     async session({ session, token }) {
-      if (token && session.user) {
-        session.user.id = token.sub!
+      // Pass the database user ID from token to session
+      if (session.user && token.userId) {
+        session.user.id = token.userId as string
       }
       return session
     },
   },
-})
+}
+
+const handler = NextAuth(authOptions)
 
 export { handler as GET, handler as POST }
 

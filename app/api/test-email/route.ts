@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
 import nodemailer from "nodemailer"
+import { requireAuthUserId } from "@/lib/auth"
 
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession()
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    // Verify user is authenticated
+    await requireAuthUserId()
 
     const { profile } = await request.json()
 
@@ -17,21 +14,33 @@ export async function POST(request: Request) {
     }
 
     // Create test transporter
-    const transporter = nodemailer.createTransport({
-      host: profile.smtpServer,
-      port: Number.parseInt(profile.smtpPort || "587"),
-      secure: profile.smtpPort === "465",
-      auth: {
+    const transporter = profile.smtpServer === "smtp.google.com"
+      ? nodemailer.createTransport({
+        service: "gmail",
+        auth: {
         user: profile.smtpUsername,
         pass: profile.smtpPassword,
-      },
-    })
+        },
+      })
+      : nodemailer.createTransport({
+        host: profile.smtpServer,
+        port: Number.parseInt(profile.smtpPort || "587"),
+        secure: profile.smtpPort === "465",
+        requireTLS: profile.smtpPort !== "465",
+        auth: {
+        user: profile.smtpUsername,
+        pass: profile.smtpPassword,
+        },
+      })
 
     // Verify connection
     await transporter.verify()
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    if (error instanceof Error && error.message.includes("Unauthorized")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
     console.error("Error testing email connection:", error)
     return NextResponse.json(
       {

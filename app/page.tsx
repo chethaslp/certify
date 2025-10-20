@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Settings, Mail, Save } from "lucide-react"
+import { Settings, Mail, Save, FileText } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { UserNav } from "@/components/user-nav"
 
@@ -54,6 +54,16 @@ export default function Home() {
             </div>
             <h2 className="text-xl font-semibold mb-2">Send Emails</h2>
             <p className="text-gray-600 dark:text-gray-400">Send emails using templates and CSV data</p>
+          </div>
+        </Link>
+
+        <Link href="/email-templates" className="block">
+          <div className="border border-gray-200 dark:border-gray-800 rounded-lg p-6 hover:border-primary hover:shadow-md transition-all">
+            <div className="h-40 bg-gray-100 dark:bg-gray-800 rounded-md flex items-center justify-center mb-4">
+              <FileText className="h-12 w-12 text-gray-400 dark:text-gray-600" />
+            </div>
+            <h2 className="text-xl font-semibold mb-2">Email Templates</h2>
+            <p className="text-gray-600 dark:text-gray-400">Create and manage email templates for campaigns</p>
           </div>
         </Link>
       </div>

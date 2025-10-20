@@ -1,22 +1,19 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
+import { requireAuthUserId } from "@/lib/auth"
 
 export const runtime = "nodejs"
 
 export async function GET(request: NextRequest) {
-  const session = await getServerSession()
+  try {
+    await requireAuthUserId()
 
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+    const profileId = request.nextUrl.searchParams.get("profileId")
+    const templateId = request.nextUrl.searchParams.get("templateId")
+    const emailColumn = request.nextUrl.searchParams.get("emailColumn")
 
-  const profileId = request.nextUrl.searchParams.get("profileId")
-  const templateId = request.nextUrl.searchParams.get("templateId")
-  const emailColumn = request.nextUrl.searchParams.get("emailColumn")
-
-  if (!profileId || !templateId || !emailColumn) {
-    return NextResponse.json({ error: "Missing required parameters" }, { status: 400 })
-  }
+    if (!profileId || !templateId || !emailColumn) {
+      return NextResponse.json({ error: "Missing required parameters" }, { status: 400 })
+    }
 
   // Set up stream response
   const encoder = new TextEncoder()
@@ -41,6 +38,12 @@ export async function GET(request: NextRequest) {
       Connection: "keep-alive",
     },
   })
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("Unauthorized")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    return NextResponse.json({ error: "Failed to establish SSE connection" }, { status: 500 })
+  }
 }
 
 // This function will be called from the main API endpoint
