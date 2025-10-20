@@ -175,9 +175,6 @@ async function sendEmailsInBackground(
 
         sent++
 
-        // Add slight delay to avoid overwhelming the email server
-        await new Promise((resolve) => setTimeout(resolve, 200))
-
         sendSSEMessage({
           type: "progress",
           total: csvData.length,
