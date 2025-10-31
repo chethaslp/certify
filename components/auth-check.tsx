@@ -21,7 +21,8 @@ export function AuthCheck({ children }: AuthCheckProps) {
     if (status === "loading") return
 
     // Allow access to these routes without authentication
-    if (pathname === "/login") {
+    const publicRoutes = ["/login", "/"]
+    if (publicRoutes.includes(pathname)) {
       setIsChecking(false)
       return
     }
