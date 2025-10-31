@@ -1,10 +1,9 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Link, Image } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
 
 interface EmailEditorProps {
   initialContent: string
@@ -12,116 +11,149 @@ interface EmailEditorProps {
 }
 
 export default function EmailEditor({ initialContent, onChange }: EmailEditorProps) {
-  const [editorContent, setEditorContent] = useState(initialContent)
-  const [showHtml, setShowHtml] = useState(false)
+  const [content, setContent] = useState(initialContent)
 
-  useEffect(() => {
-    // Initialize the editor with content
-    const editor = document.getElementById("email-editor-content")
-    if (editor) {
-      editor.innerHTML = initialContent
-    }
-  }, [initialContent])
-
-  const handleContentChange = () => {
-    const editor = document.getElementById("email-editor-content")
-    if (editor) {
-      const content = editor.innerHTML
-      setEditorContent(content)
-      onChange(content)
-    }
+  const handleChange = (value: string) => {
+    setContent(value)
+    onChange(value)
   }
 
-  const execCommand = (command: string, value = "") => {
-    document.execCommand(command, false, value)
-    handleContentChange()
-  }
+  const insertTag = (tag: string) => {
+    const textarea = document.getElementById("html-editor") as HTMLTextAreaElement
+    if (!textarea) return
 
-  const toggleBold = () => execCommand("bold")
-  const toggleItalic = () => execCommand("italic")
-  const toggleUnderline = () => execCommand("underline")
-  const alignLeft = () => execCommand("justifyLeft")
-  const alignCenter = () => execCommand("justifyCenter")
-  const alignRight = () => execCommand("justifyRight")
-
-  const insertLink = () => {
-    const url = prompt("Enter URL:")
-    if (url) {
-      execCommand("createLink", url)
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const selectedText = content.substring(start, end)
+    
+    let newContent = ""
+    if (tag === "link") {
+      newContent = content.substring(0, start) + 
+        `<a href="https://example.com">${selectedText || "Link text"}</a>` + 
+        content.substring(end)
+    } else if (tag === "image") {
+      newContent = content.substring(0, start) + 
+        `<img src="https://via.placeholder.com/150" alt="Image" />` + 
+        content.substring(end)
+    } else {
+      newContent = content.substring(0, start) + 
+        `<${tag}>${selectedText || `${tag} text`}</${tag}>` + 
+        content.substring(end)
     }
-  }
-
-  const insertImage = () => {
-    const url = prompt("Enter image URL:")
-    if (url) {
-      execCommand("insertImage", url)
-    }
-  }
-
-  const toggleHtmlView = () => {
-    const editor = document.getElementById("email-editor-content")
-    if (editor && !showHtml) {
-      setEditorContent(editor.innerHTML)
-    }
-    setShowHtml(!showHtml)
-  }
-
-  const handleHtmlChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setEditorContent(e.target.value)
-    onChange(e.target.value)
+    
+    handleChange(newContent)
   }
 
   return (
-    <div className="border rounded-md overflow-hidden dark:border-gray-700">
-      <div className="bg-gray-50 dark:bg-gray-800 p-2 border-b dark:border-gray-700 flex flex-wrap gap-1">
-        <Button type="button" variant="ghost" size="sm" onClick={toggleBold} className="h-8 w-8 p-0">
-          <Bold className="h-4 w-4" />
-        </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={toggleItalic} className="h-8 w-8 p-0">
-          <Italic className="h-4 w-4" />
-        </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={toggleUnderline} className="h-8 w-8 p-0">
-          <Underline className="h-4 w-4" />
-        </Button>
-        <div className="w-px h-8 bg-gray-300 mx-1"></div>
-        <Button type="button" variant="ghost" size="sm" onClick={alignLeft} className="h-8 w-8 p-0">
-          <AlignLeft className="h-4 w-4" />
-        </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={alignCenter} className="h-8 w-8 p-0">
-          <AlignCenter className="h-4 w-4" />
-        </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={alignRight} className="h-8 w-8 p-0">
-          <AlignRight className="h-4 w-4" />
-        </Button>
-        <div className="w-px h-8 bg-gray-300 mx-1"></div>
-        <Button type="button" variant="ghost" size="sm" onClick={insertLink} className="h-8 w-8 p-0">
-          <Link className="h-4 w-4" />
-        </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={insertImage} className="h-8 w-8 p-0">
-          <Image className="h-4 w-4" />
-        </Button>
-        <div className="flex-grow"></div>
-        <Button type="button" variant="outline" size="sm" onClick={toggleHtmlView}>
-          {showHtml ? "Visual Editor" : "HTML"}
-        </Button>
-      </div>
+    <div className="border rounded-md overflow-hidden">
+      <Tabs defaultValue="edit" className="w-full">
+        <div className="border-b bg-muted/50 px-2 py-1">
+          <TabsList className="h-9">
+            <TabsTrigger value="edit" className="text-xs">Edit HTML</TabsTrigger>
+            <TabsTrigger value="preview" className="text-xs">Preview</TabsTrigger>
+          </TabsList>
+        </div>
 
-      {showHtml ? (
-        <textarea
-          value={editorContent}
-          onChange={handleHtmlChange}
-          className="w-full h-64 p-3 font-mono text-sm bg-white dark:bg-gray-900 dark:text-gray-200"
-        />
-      ) : (
-        <div
-          id="email-editor-content"
-          contentEditable
-          onInput={handleContentChange}
-          onBlur={handleContentChange}
-          className="w-full h-64 p-3 focus:outline-none overflow-y-auto bg-white dark:bg-gray-900 dark:text-gray-200"
-        ></div>
-      )}
+        <TabsContent value="edit" className="m-0 p-0">
+          <div className="bg-muted/30 p-2 border-b flex flex-wrap gap-1">
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={() => insertTag("p")}
+              className="h-7 px-2 text-xs"
+            >
+              Paragraph
+            </Button>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={() => insertTag("strong")}
+              className="h-7 px-2 text-xs"
+            >
+              <strong>Bold</strong>
+            </Button>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={() => insertTag("em")}
+              className="h-7 px-2 text-xs"
+            >
+              <em>Italic</em>
+            </Button>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={() => insertTag("h1")}
+              className="h-7 px-2 text-xs"
+            >
+              H1
+            </Button>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={() => insertTag("h2")}
+              className="h-7 px-2 text-xs"
+            >
+              H2
+            </Button>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={() => insertTag("h3")}
+              className="h-7 px-2 text-xs"
+            >
+              H3
+            </Button>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={() => insertTag("ul")}
+              className="h-7 px-2 text-xs"
+            >
+              List
+            </Button>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={() => insertTag("link")}
+              className="h-7 px-2 text-xs"
+            >
+              Link
+            </Button>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={() => insertTag("image")}
+              className="h-7 px-2 text-xs"
+            >
+              Image
+            </Button>
+          </div>
+          <Textarea
+            id="html-editor"
+            value={content}
+            onChange={(e) => handleChange(e.target.value)}
+            placeholder="Write your HTML content here..."
+            className="min-h-[400px] font-mono text-sm border-0 rounded-none resize-none focus-visible:ring-0"
+          />
+        </TabsContent>
+
+        <TabsContent value="preview" className="m-0 p-4 min-h-[400px]">
+          <div 
+            className="prose prose-sm max-w-none dark:prose-invert"
+            dangerouslySetInnerHTML={{ __html: content }}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
-

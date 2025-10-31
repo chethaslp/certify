@@ -30,6 +30,7 @@ interface EmailTemplate {
   id: string
   name: string
   subject: string
+  content: string
 }
 
 interface Template {
@@ -454,6 +455,37 @@ export default function SendEmailPage() {
                         </Link>{" "}
                         to send emails.
                       </p>
+                    )}
+                    
+                    {/* Email Template Preview */}
+                    {selectedEmailTemplate && emailTemplates.find((t) => t.id === selectedEmailTemplate) && (
+                      <div className="mt-4 border rounded-lg p-4 bg-muted/50">
+                        <div className="flex justify-between items-center mb-3">
+                          <h4 className="font-semibold text-sm">Email Template Preview</h4>
+                          <Link href={`/email-templates/edit/${selectedEmailTemplate}`}>
+                            <Button variant="outline" size="sm">
+                              Edit Template
+                            </Button>
+                          </Link>
+                        </div>
+                        <div className="space-y-2">
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground">Subject:</p>
+                            <p className="text-sm">
+                              {emailTemplates.find((t) => t.id === selectedEmailTemplate)?.subject}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground">Content Preview:</p>
+                            <div 
+                              className="text-sm border rounded p-2 bg-background max-h-40 overflow-y-auto prose prose-sm max-w-none"
+                              dangerouslySetInnerHTML={{ 
+                                __html: emailTemplates.find((t) => t.id === selectedEmailTemplate)?.content.substring(0, 300) + (emailTemplates.find((t) => t.id === selectedEmailTemplate)?.content.length ?? 0 > 300 ? '...' : '') || '' 
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
 

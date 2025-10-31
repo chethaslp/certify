@@ -6,9 +6,8 @@ import { Toaster } from "@/components/ui/toaster"
 import { AuthCheck } from "@/components/auth-check"
 
 export const metadata = {
-  title: "Template Creator",
-  description: "Create templates with background images and text fields, then generate images using CSV data.",
-    generator: 'v0.dev'
+  title: "Certify by @clp",
+  description: "Create and send beautiful certificates with ease.",
 }
 
 export default function RootLayout({
