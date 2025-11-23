@@ -10,9 +10,9 @@ export async function POST(request: Request) {
   try {
     const userId = await requireAuthUserId()
 
-    const { profileId, templateId, emailColumn, csvData, images } = await request.json()
+    const { profileId, templateId, emailColumn, csvData } = await request.json()
 
-    if (!profileId || !templateId || !emailColumn || !csvData || !images) {
+    if (!profileId || !templateId || !emailColumn || !csvData) {
       return NextResponse.json({ error: "Missing required data" }, { status: 400 })
     }
 
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     const response = NextResponse.json({ success: true })
 
     // Continue processing in the background
-    sendEmailsInBackground(profile, emailTemplate, emailColumn, csvData, images)
+    sendEmailsInBackground(profile, emailTemplate, emailColumn, csvData)
 
     return response
   } catch (error) {
@@ -66,7 +66,6 @@ async function sendEmailsInBackground(
   emailTemplate: any,
   emailColumn: string,
   csvData: Array<Record<string, string>>,
-  images: string[],
 ) {
   try {
     // Create email transporter
@@ -148,26 +147,12 @@ async function sendEmailsInBackground(
           content = content.replace(regex, value as string)
         }
 
-        // Get image for this recipient
-        const imageData = images[i]?.split(",")[1]
-
-        if (!imageData) {
-          throw new Error("Image data missing for this recipient")
-        }
-
         // Send email
         await transporter.sendMail({
           from: `"${profile.senderName}" <${profile.senderEmail}>`,
           to: email,
           subject: subject,
           html: content,
-          attachments: [
-            {
-              filename: "Certificate.png",
-              content: imageData,
-              encoding: "base64",
-            },
-          ],
         })
 
         sent++
@@ -213,4 +198,3 @@ async function sendEmailsInBackground(
     })
   }
 }
-

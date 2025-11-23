@@ -8,9 +8,9 @@ import { useToast } from "@/components/ui/use-toast"
 interface TestSendDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  templateId: string
+  templateId?: string
   profileId: string
-  emailTemplateId?: string // Optional, not used in current API
+  emailTemplateId?: string
 }
 
 export function TestSendDialog({ open, onOpenChange, templateId, profileId, emailTemplateId }: TestSendDialogProps) {
@@ -20,17 +20,26 @@ export function TestSendDialog({ open, onOpenChange, templateId, profileId, emai
   const { toast } = useToast()
 
   React.useEffect(() => {
-    if (open && templateId) {
-      fetch(`/api/send-emails/test?templateId=${templateId}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.requiredFields) {
-            setFields(data.requiredFields)
-            setForm(Object.fromEntries(data.requiredFields.map((f: string) => [f, ""])))
-          }
-        })
+    if (open) {
+      const params = new URLSearchParams()
+      if (templateId) params.append("templateId", templateId)
+      if (emailTemplateId) params.append("emailTemplateId", emailTemplateId)
+
+      if (params.toString()) {
+        fetch(`/api/send-emails/test?${params.toString()}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.requiredFields) {
+              setFields(data.requiredFields)
+              setForm(Object.fromEntries(data.requiredFields.map((f: string) => [f, ""])))
+            }
+          })
+      } else {
+        setFields(["email"])
+        setForm({ email: "" })
+      }
     }
-  }, [open, templateId])
+  }, [open, templateId, emailTemplateId])
 
   const handleChange = (field: string, value: string) => {
     setForm(f => ({ ...f, [field]: value }))

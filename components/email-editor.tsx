@@ -45,17 +45,9 @@ export default function EmailEditor({ initialContent, onChange }: EmailEditorPro
   }
 
   return (
-    <div className="border rounded-md overflow-hidden">
-      <Tabs defaultValue="edit" className="w-full">
-        <div className="border-b bg-muted/50 px-2 py-1">
-          <TabsList className="h-9">
-            <TabsTrigger value="edit" className="text-xs">Edit HTML</TabsTrigger>
-            <TabsTrigger value="preview" className="text-xs">Preview</TabsTrigger>
-          </TabsList>
-        </div>
-
-        <TabsContent value="edit" className="m-0 p-0">
-          <div className="bg-muted/30 p-2 border-b flex flex-wrap gap-1">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-[600px]">
+      <div className="border rounded-md flex flex-col overflow-hidden">
+        <div className="bg-muted/30 p-2 border-b flex flex-wrap gap-1">
             <Button 
               type="button" 
               variant="outline" 
@@ -143,17 +135,21 @@ export default function EmailEditor({ initialContent, onChange }: EmailEditorPro
             value={content}
             onChange={(e) => handleChange(e.target.value)}
             placeholder="Write your HTML content here..."
-            className="min-h-[400px] font-mono text-sm border-0 rounded-none resize-none focus-visible:ring-0"
+            className="flex-1 font-mono text-sm border-0 rounded-none resize-none focus-visible:ring-0 p-4"
           />
-        </TabsContent>
+      </div>
 
-        <TabsContent value="preview" className="m-0 p-4 min-h-[400px]">
+      <div className="border rounded-md overflow-hidden flex flex-col">
+        <div className="bg-muted/50 px-4 py-2 border-b text-sm font-medium">
+          Preview
+        </div>
+        <div className="flex-1 overflow-auto p-4 bg-white dark:bg-black">
           <div 
             className="prose prose-sm max-w-none dark:prose-invert"
             dangerouslySetInnerHTML={{ __html: content }}
           />
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
     </div>
   )
 }

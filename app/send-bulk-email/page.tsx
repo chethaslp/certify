@@ -33,12 +33,6 @@ interface EmailTemplate {
   content: string
 }
 
-interface Template {
-  id: string
-  name: string
-  thumbnail?: string
-}
-
 interface SendingStatus {
   total: number
   sent: number
@@ -49,20 +43,17 @@ interface SendingStatus {
   complete: boolean
 }
 
-export default function SendEmailPage() {
+export default function SendBulkEmailPage() {
   const { data: session } = useSession()
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [emailProfiles, setEmailProfiles] = useState<EmailProfile[]>([])
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([])
-  const [templates, setTemplates] = useState<Template[]>([])
   const [selectedEmailProfile, setSelectedEmailProfile] = useState<string>("")
   const [selectedEmailTemplate, setSelectedEmailTemplate] = useState<string>("")
-  const [selectedTemplate, setSelectedTemplate] = useState<string>("")
   const [csvData, setCsvData] = useState<Array<Record<string, string>>>([])
   const [emailColumnField, setEmailColumnField] = useState<string>("")
-  const [generatedImages, setGeneratedImages] = useState<string[]>([])
   const [sendingStatus, setSendingStatus] = useState<SendingStatus>({
     total: 0,
     sent: 0,
@@ -97,13 +88,6 @@ export default function SendEmailPage() {
           const data = await emailTemplatesResponse.json()
           setEmailTemplates(data.templates || [])
         }
-
-        // Fetch templates
-        const templatesResponse = await fetch("/api/templates")
-        if (templatesResponse.ok) {
-          const data = await templatesResponse.json()
-          setTemplates(data.templates || [])
-        }
       } catch (error) {
         console.error("Error fetching data:", error)
         toast({
@@ -129,60 +113,11 @@ export default function SendEmailPage() {
     })
   }
 
-  const handleGenerateImages = async () => {
-    if (!selectedTemplate || !csvData.length) {
-      toast({
-        title: "Missing requirements",
-        description: "Please select a template and import CSV data.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    try {
-      const response = await fetch(`/api/templates/${selectedTemplate}/generate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ csvData }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to generate images")
-      }
-
-      const data = await response.json()
-      setGeneratedImages(data.images)
-
-      toast({
-        title: "Images Generated",
-        description: `Successfully generated ${data.images.length} images.`,
-      })
-    } catch (error) {
-      console.error("Error generating images:", error)
-      toast({
-        title: "Error",
-        description: "Failed to generate images. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
   const handleSendEmails = async () => {
     if (!selectedEmailProfile || !selectedEmailTemplate || !emailColumnField || !csvData.length) {
       toast({
         title: "Missing requirements",
         description: "Please complete all setup steps before sending.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (!generatedImages || generatedImages.length === 0) {
-      toast({
-        title: "Missing images",
-        description: "Please generate images before sending emails.",
         variant: "destructive",
       })
       return
@@ -272,7 +207,7 @@ export default function SendEmailPage() {
       }
 
       // Send initial request to start the email sending process
-      const response = await fetch("/api/send-emails", {
+      const response = await fetch("/api/send-bulk-emails", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -282,7 +217,6 @@ export default function SendEmailPage() {
           templateId: selectedEmailTemplate,
           emailColumn: emailColumnField,
           csvData,
-          images: generatedImages,
         }),
       })
 
@@ -380,7 +314,7 @@ export default function SendEmailPage() {
               Back
             </Button>
           </Link>
-          <h1 className="text-3xl font-bold ml-4">Send Emails</h1>
+          <h1 className="text-3xl font-bold ml-4">Send Bulk Emails</h1>
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle />
@@ -458,29 +392,6 @@ export default function SendEmailPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="template">Image Template</Label>
-                    <div className="flex gap-2">
-                      <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
-                        <SelectTrigger id="template" className="flex-1">
-                          <SelectValue placeholder="Select a template" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {templates.map((template) => (
-                            <SelectItem key={template.id} value={template.id}>
-                              {template.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Link href="/create">
-                        <Button variant="outline" size="icon" title="Create new template">
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
                     <Label>CSV Data</Label>
                     <div className="border rounded-lg p-4">
                       <CSVImporter onDataImported={handleCSVImport} />
@@ -506,11 +417,11 @@ export default function SendEmailPage() {
                   )}
 
                   <Button
-                    onClick={handleGenerateImages}
-                    disabled={!selectedTemplate || csvData.length === 0}
+                    onClick={() => setActiveTab("preview")}
+                    disabled={!selectedEmailTemplate || csvData.length === 0 || !emailColumnField}
                     className="w-full"
                   >
-                    Generate Images & Continue
+                    Continue to Preview
                   </Button>
                 </CardContent>
               </Card>
@@ -522,7 +433,7 @@ export default function SendEmailPage() {
                   <CardTitle>Preview & Send</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {generatedImages.length > 0 ? (
+                  {csvData.length > 0 ? (
                     <>
                       <div className="space-y-2">
                         <h3 className="text-lg font-medium">Email Configuration</h3>
@@ -577,32 +488,12 @@ export default function SendEmailPage() {
                         </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <h3 className="text-lg font-medium">Generated Images Preview</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                          {generatedImages.slice(0, 6).map((img, index) => (
-                            <div key={index} className="border rounded overflow-hidden">
-                              <img
-                                src={img || "/placeholder.svg"}
-                                alt={`Preview ${index + 1}`}
-                                className="w-full h-auto"
-                              />
-                            </div>
-                          ))}
-                          {generatedImages.length > 6 && (
-                            <div className="border rounded flex items-center justify-center p-4 text-sm text-muted-foreground">
-                              +{generatedImages.length - 6} more images
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
                       <div className="flex gap-2">
                         <Button
                           onClick={() => setTestDialogOpen(true)}
                           variant="outline"
                           className="flex-1"
-                          disabled={!selectedTemplate || !selectedEmailTemplate}
+                          disabled={!selectedEmailTemplate}
                         >
                           <Mail className="mr-2 h-4 w-4" />
                           Send Test Email
@@ -620,9 +511,9 @@ export default function SendEmailPage() {
                   ) : (
                     <div className="text-center py-12">
                       <Mail className="mx-auto h-12 w-12 text-muted-foreground opacity-20 mb-4" />
-                      <h3 className="text-lg font-medium mb-2">No images generated yet</h3>
+                      <h3 className="text-lg font-medium mb-2">No data imported</h3>
                       <p className="text-muted-foreground mb-4">
-                        Please select a template and import CSV data to generate images
+                        Please import CSV data to send emails
                       </p>
                       <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
                         <Upload className="mr-2 h-4 w-4" />
@@ -643,7 +534,6 @@ export default function SendEmailPage() {
               <TestSendDialog
                 open={testDialogOpen}
                 onOpenChange={setTestDialogOpen}
-                templateId={selectedTemplate}
                 profileId={selectedEmailProfile}
                 emailTemplateId={selectedEmailTemplate}
               />
@@ -781,9 +671,9 @@ export default function SendEmailPage() {
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-sm font-semibold">2. Choose templates</h3>
+                  <h3 className="text-sm font-semibold">2. Choose template</h3>
                   <p className="text-sm text-muted-foreground">
-                    Select both the email content template and the image template to use.
+                    Select the email content template to use.
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -795,7 +685,7 @@ export default function SendEmailPage() {
                 <div className="space-y-2">
                   <h3 className="text-sm font-semibold">4. Review and send</h3>
                   <p className="text-sm text-muted-foreground">
-                    Preview the generated images and recipient list before sending.
+                    Preview the recipient list before sending.
                   </p>
                 </div>
               </CardContent>
@@ -849,4 +739,3 @@ export default function SendEmailPage() {
     </main>
   )
 }
-

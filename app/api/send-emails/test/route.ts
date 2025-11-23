@@ -29,45 +29,45 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Email template not found" }, { status: 404 })
     }
 
-    // Get design template for image generation
-    const template = await db.template.findFirst({
-      where: { id: templateId, userId },
-    })
-    if (!template) {
-      return NextResponse.json({ error: "Design template not found" }, { status: 404 })
+    // Get design template for image generation (optional)
+    let imageDataUrl = null
+    if (templateId) {
+      const template = await db.template.findFirst({
+        where: { id: templateId, userId },
+      })
+      if (!template) {
+        return NextResponse.json({ error: "Design template not found" }, { status: 404 })
+      }
+
+      // Parse text fields from JSON string
+      const textFields = JSON.parse(template.textFields)
+      const { createCanvas, loadImage } = require("canvas")
+      const CANVAS_WIDTH = 800
+      const CANVAS_HEIGHT = 500
+      const canvas = createCanvas(CANVAS_WIDTH, CANVAS_HEIGHT)
+      const ctx = canvas.getContext("2d")
+      const backgroundImage = await loadImage(template.backgroundImage)
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height)
+      for (const field of textFields) {
+        ctx.font = `${field.fontSize}px ${field.fontFamily}`
+        ctx.fillStyle = field.color
+        ctx.textAlign = "center"
+        ctx.textBaseline = "middle"
+        const fieldName = field.text.trim()
+        const text = testData[fieldName] || field.text
+        ctx.fillText(text, field.x, field.y)
+      }
+      imageDataUrl = canvas.toDataURL("image/png")
     }
 
-    // Parse text fields from JSON string
-    const textFields = JSON.parse(template.textFields)
-    const { createCanvas, loadImage } = require("canvas")
-    const CANVAS_WIDTH = 800
-    const CANVAS_HEIGHT = 500
-    const canvas = createCanvas(CANVAS_WIDTH, CANVAS_HEIGHT)
-    const ctx = canvas.getContext("2d")
-    const backgroundImage = await loadImage(template.backgroundImage)
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height)
-    for (const field of textFields) {
-      ctx.font = `${field.fontSize}px ${field.fontFamily}`
-      ctx.fillStyle = field.color
-      ctx.textAlign = "center"
-      ctx.textBaseline = "middle"
-      const fieldName = field.text.trim()
-      const text = testData[fieldName] || field.text
-      ctx.fillText(text, field.x, field.y)
-    }
-    const imageDataUrl = canvas.toDataURL("image/png")
-
-    // Replace variables in subject and content (support both {variable} and {{variable}} formats)
+    // Replace variables in subject and content (support only {{variable}} format)
     let subject = emailTemplate.subject
     let content = emailTemplate.content
     for (const [key, value] of Object.entries(testData)) {
-      const regex1 = new RegExp(`\\{${key}\\}`, "gi")
-      const regex2 = new RegExp(`\\{\\{${key}\\}\\}`, "gi")
-      subject = subject.replace(regex1, value as string)
-      subject = subject.replace(regex2, value as string)
-      content = content.replace(regex1, value as string)
-      content = content.replace(regex2, value as string)
+      const regex = new RegExp(`\\{\\{${key}\\}\\}`, "gi")
+      subject = subject.replace(regex, value as string)
+      content = content.replace(regex, value as string)
     }
 
     // Send test email
@@ -90,19 +90,21 @@ export async function POST(request: Request) {
             },
           })
           
+    const attachments = []
+    if (imageDataUrl) {
+      attachments.push({
+        filename: "test-image.png",
+        content: imageDataUrl.split(",")[1],
+        encoding: "base64",
+      })
+    }
 
     await transporter.sendMail({
       from: `${profile.senderName} <${profile.senderEmail}>`,
       to: testData.email, // assumes 'email' is always a field
       subject: subject,
       html: content,
-      attachments: [
-        {
-          filename: "test-image.png",
-          content: imageDataUrl.split(",")[1],
-          encoding: "base64",
-        },
-      ],
+      attachments: attachments,
     })
 
     return NextResponse.json({ success: true })
@@ -120,16 +122,33 @@ export async function GET(request: NextRequest) {
   try {
     const userId = await requireAuthUserId()
     const templateId = request.nextUrl.searchParams.get("templateId")
-    if (!templateId) {
-      return NextResponse.json({ error: "Missing templateId" }, { status: 400 })
+    const emailTemplateId = request.nextUrl.searchParams.get("emailTemplateId")
+    
+    if (!templateId && !emailTemplateId) {
+      return NextResponse.json({ error: "Missing templateId or emailTemplateId" }, { status: 400 })
     }
-    const template = await db.template.findFirst({ where: { id: templateId, userId } })
-    if (!template) {
-      return NextResponse.json({ error: "Template not found" }, { status: 404 })
+
+    let fieldNames: string[] = []
+
+    if (templateId) {
+      const template = await db.template.findFirst({ where: { id: templateId, userId } })
+      if (template) {
+        const textFields = JSON.parse(template.textFields)
+        fieldNames = Array.from(new Set(textFields.map((f: any) => f.text.trim())))
+      }
+    } else if (emailTemplateId) {
+      const emailTemplate = await db.emailTemplate.findFirst({ where: { id: emailTemplateId, userId } })
+      if (emailTemplate) {
+        const regex = /\{\{([a-zA-Z0-9_]+)\}\}/g
+        const text = (emailTemplate.subject + " " + emailTemplate.content)
+        let match
+        while ((match = regex.exec(text)) !== null) {
+          fieldNames.push(match[1])
+        }
+        fieldNames = Array.from(new Set(fieldNames))
+      }
     }
-    const textFields = JSON.parse(template.textFields)
-    // Collect unique field names
-    const fieldNames = Array.from(new Set(textFields.map((f: any) => f.text.trim())));
+
     // Always include 'email' as required
     if (!fieldNames.includes('email')) fieldNames.push('email')
     return NextResponse.json({ requiredFields: fieldNames })

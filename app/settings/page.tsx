@@ -76,10 +76,19 @@ export default function Settings() {
 
   const handleNewProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setNewEmailProfile((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
+    setNewEmailProfile((prev) => {
+      const newState = {
+        ...prev,
+        [name]: value,
+      }
+
+      // Auto-fill sender email if using Google and username changes
+      if (prev.smtpServer === "smtp.google.com" && name === "smtpUsername") {
+        newState.senderEmail = value
+      }
+
+      return newState
+    })
   }
 
   const handleNewProfileSwitchChange = (checked: boolean) => {
@@ -408,6 +417,30 @@ export default function Settings() {
                 value={newEmailProfile.profileName}
                 onChange={handleNewProfileChange}
               />
+            </div>
+
+            <div className="flex items-center space-x-2 bg-muted/50 p-3 rounded-md border">
+              <Switch
+                id="useGoogle"
+                checked={newEmailProfile.smtpServer === "smtp.google.com"}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setNewEmailProfile((prev) => ({
+                      ...prev,
+                      smtpServer: "smtp.google.com",
+                      smtpPort: "587",
+                      senderEmail: prev.smtpUsername,
+                    }))
+                  } else {
+                    setNewEmailProfile((prev) => ({
+                      ...prev,
+                      smtpServer: "",
+                      smtpPort: "587",
+                    }))
+                  }
+                }}
+              />
+              <Label htmlFor="useGoogle" className="cursor-pointer">Use Google (Gmail)</Label>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

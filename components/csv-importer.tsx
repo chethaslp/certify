@@ -5,7 +5,9 @@ import type React from "react"
 import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { FileIcon, UploadIcon } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { FileIcon, UploadIcon, ClipboardPaste } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface CSVImporterProps {
@@ -15,6 +17,7 @@ interface CSVImporterProps {
 export default function CSVImporter({ onDataImported }: CSVImporterProps) {
   const [fileName, setFileName] = useState<string>("")
   const [error, setError] = useState<string>("")
+  const [pastedText, setPastedText] = useState<string>("")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -49,6 +52,23 @@ export default function CSVImporter({ onDataImported }: CSVImporterProps) {
     reader.readAsText(file)
   }
 
+  const handlePasteParse = () => {
+    setError("")
+    if (!pastedText.trim()) {
+      setError("Please paste some CSV data")
+      return
+    }
+
+    try {
+      const data = parseCSV(pastedText)
+      onDataImported(data)
+      setFileName("Pasted Data")
+    } catch (err) {
+      setError("Failed to parse CSV data. Please check the format.")
+      console.error(err)
+    }
+  }
+
   const parseCSV = (text: string): Array<Record<string, string>> => {
     // Split by lines
     const lines = text.split(/\r\n|\n/)
@@ -81,13 +101,35 @@ export default function CSVImporter({ onDataImported }: CSVImporterProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="w-full">
-          <UploadIcon className="mr-2 h-4 w-4" />
-          Upload CSV
-        </Button>
-        <Input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleFileChange} />
-      </div>
+      <Tabs defaultValue="upload" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="upload">Upload File</TabsTrigger>
+          <TabsTrigger value="paste">Paste Text</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="upload" className="space-y-4 mt-4">
+          <div className="flex items-center gap-2">
+            <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="w-full">
+              <UploadIcon className="mr-2 h-4 w-4" />
+              Upload CSV
+            </Button>
+            <Input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleFileChange} />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="paste" className="space-y-4 mt-4">
+          <Textarea
+            placeholder="Paste your CSV data here..."
+            className="min-h-[150px] font-mono text-sm"
+            value={pastedText}
+            onChange={(e) => setPastedText(e.target.value)}
+          />
+          <Button onClick={handlePasteParse} className="w-full">
+            <ClipboardPaste className="mr-2 h-4 w-4" />
+            Parse CSV
+          </Button>
+        </TabsContent>
+      </Tabs>
 
       {fileName && (
         <div className="flex items-center gap-2 text-sm">
@@ -103,9 +145,9 @@ export default function CSVImporter({ onDataImported }: CSVImporterProps) {
       )}
 
       <div className="text-sm text-gray-500">
-        <p>Upload a CSV file with headers that match your text field names to generate multiple images.</p>
+        <p>Upload a CSV file or paste CSV text with headers that match your text field names.</p>
         <p className="mt-1">Example format:</p>
-        <pre className="bg-gray-100 p-2 rounded text-xs mt-1">
+        <pre className="bg-gray-100 dark:bg-gray-800 p-2 rounded text-xs mt-1">
           Name,Title,ID
           <br />
           John Doe,Manager,12345
