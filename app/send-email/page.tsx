@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronLeft, Upload, Check, AlertCircle, Mail, Plus } from "lucide-react"
+import { ChevronLeft, Upload, Check, AlertCircle, Mail, Plus, Download } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { UserNav } from "@/components/user-nav"
@@ -370,6 +370,47 @@ export default function SendEmailPage() {
     reader.readAsText(file)
   }
 
+  const handleDownloadCertificates = async () => {
+    if (!generatedImages.length) return
+
+    try {
+      const JSZip = (await import("jszip")).default
+      const { saveAs } = await import("file-saver")
+
+      const zip = new JSZip()
+
+      generatedImages.forEach((imgData, index) => {
+        // imgData is likely a data URL: data:image/png;base64,...
+        const base64Data = imgData.split(",")[1]
+        const row = csvData[index]
+        let filename = `certificate-${index + 1}.png`
+
+        if (emailColumnField && row[emailColumnField]) {
+          // Sanitize filename
+          const safeName = row[emailColumnField].replace(/[^a-z0-9]/gi, "_").toLowerCase()
+          filename = `${safeName}.png`
+        }
+
+        zip.file(filename, base64Data, { base64: true })
+      })
+
+      const content = await zip.generateAsync({ type: "blob" })
+      saveAs(content, "certificates.zip")
+
+      toast({
+        title: "Download started",
+        description: "Your certificates are being downloaded.",
+      })
+    } catch (error) {
+      console.error("Error downloading certificates:", error)
+      toast({
+        title: "Error",
+        description: "Failed to download certificates.",
+        variant: "destructive",
+      })
+    }
+  }
+
   return (
     <main className="container mx-auto py-8 px-4">
       <div className="flex items-center justify-between mb-6">
@@ -606,6 +647,14 @@ export default function SendEmailPage() {
                         >
                           <Mail className="mr-2 h-4 w-4" />
                           Send Test Email
+                        </Button>
+                        <Button
+                          onClick={handleDownloadCertificates}
+                          variant="outline"
+                          className="flex-1"
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          Download All
                         </Button>
                         <Button
                           onClick={handleSendEmails}
